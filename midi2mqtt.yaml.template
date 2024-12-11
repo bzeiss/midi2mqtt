@@ -1,0 +1,60 @@
+mqtt:
+  # Basic connection settings
+  broker:
+    host: "127.0.0.1"
+    port: 1883
+    protocol: "mqtt"  # mqtt, mqtts, ws, wss
+    
+  # Client settings
+  client:
+    client_id: "midi2mqtt-client"
+    clean_session: true
+    keepalive: 60
+    
+  # Authentication
+  auth:
+    username: ""
+    password: ""
+    
+  # TLS/SSL Configuration
+  tls:
+    enabled: false
+    verify_cert: true
+    ca_cert: "/path/to/ca.crt"
+    client_cert: "/path/to/client.crt"
+    client_key: "/path/to/client.key"
+    starttls: false
+    
+  # Topic Configuration
+  topics:
+    publications:
+      - topic: "midi/events"
+        qos: 1
+        retain: false
+        
+  # Connection behavior
+  connection:
+    retry_interval: 10 # Will retry every 10 seconds
+    timeout: 30 # Will timeout after 30 seconds
+
+midi:
+  # MIDI port configuration
+  port: ""  # Set this to the MIDI port name you want to use
+  
+  # Event type whitelist
+  # Available event types:
+  # - note_on          : Note press with velocity
+  # - note_off         : Note release
+  # - cc:[0-127]       : Control Change events (e.g., cc:1 for modulation wheel, cc:7 for volume)
+  # - pitch_bend       : Pitch bend wheel
+  # - program_change   : Program/patch change
+  # - channel_pressure : Channel aftertouch (mono pressure)
+  event_types:
+    - note_on
+    - note_off
+    # Examples of other events you might want to enable:
+    # - cc:1    # Modulation wheel
+    # - cc:74   # Filter cutoff
+    # - pitch_bend
+
+debug: false
