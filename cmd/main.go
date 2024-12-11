@@ -188,13 +188,6 @@ func listPorts() {
 	}
 }
 
-func printUsage() {
-	fmt.Println("Usage:")
-	fmt.Println("  midi2mqtt list-ports                 List available MIDI ports")
-	fmt.Println("  midi2mqtt test                       Run in test mode (dump MIDI events to stdout)")
-	fmt.Println("  midi2mqtt                            Run in MQTT bridge mode")
-}
-
 // formatEvent creates a compact one-line string representation of a MIDI event
 func formatEvent(data []byte) string {
 	var event map[string]interface{}
