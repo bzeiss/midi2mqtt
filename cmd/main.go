@@ -181,7 +181,7 @@ func listPorts() {
 		fmt.Println("No MIDI input ports found")
 		return
 	}
-	
+
 	fmt.Println("Available MIDI input ports:")
 	for i, port := range ports {
 		fmt.Printf("%d: %s\n", i+1, port)
@@ -251,14 +251,14 @@ func formatEvent(data []byte) string {
 			getString("key"),
 			getInt("octave"),
 			getUint8("velocity"))
-	
+
 	case "pitch_bend":
 		return fmt.Sprintf("%s %s ch:%d value:%d\n",
 			timeStr,
 			eventType,
 			channel,
 			getInt16("pitch_bend"))
-	
+
 	default:
 		if len(eventType) >= 3 && eventType[:2] == "cc" {
 			return fmt.Sprintf("%s %s ch:%d value:%d\n",
@@ -267,7 +267,7 @@ func formatEvent(data []byte) string {
 				channel,
 				getUint8("value"))
 		}
-		
+
 		// Generic format for other events
 		return fmt.Sprintf("%s %s ch:%d\n",
 			timeStr,
