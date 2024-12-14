@@ -57,4 +57,6 @@ midi:
     # - cc:74   # Filter cutoff
     # - pitch_bend
 
-debug: false
+# Logging Configuration
+# Available levels: DEBUG, INFO, WARN, ERROR
+log_level: "INFO"

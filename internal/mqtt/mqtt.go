@@ -4,13 +4,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	paho "github.com/eclipse/paho.mqtt.golang"
 	"midi2mqtt/internal/config"
+
+	paho "github.com/eclipse/paho.mqtt.golang"
 )
 
 // MQTTClient represents an MQTT client with connection management
@@ -20,12 +22,14 @@ type MQTTClient struct {
 	mu           sync.RWMutex
 	isConnected  bool
 	reconnecting bool
+	logger       *slog.Logger
 }
 
 // NewMQTTClient creates a new MQTT client and establishes a connection
-func NewMQTTClient(cfg *config.MQTTConfig) (*MQTTClient, error) {
+func NewMQTTClient(cfg *config.MQTTConfig, logger *slog.Logger) (*MQTTClient, error) {
 	m := &MQTTClient{
 		config: cfg,
+		logger: logger,
 	}
 
 	if err := m.Connect(); err != nil {
@@ -79,7 +83,7 @@ func (m *MQTTClient) Connect() error {
 	opts := paho.NewClientOptions()
 	broker := fmt.Sprintf("%s://%s:%d", m.config.Broker.Protocol, m.config.Broker.Host, m.config.Broker.Port)
 	opts.AddBroker(broker)
-	
+
 	// Setup TLS if enabled
 	if m.config.TLS.Enabled {
 		tlsConfig, err := m.setupTLSConfig()
@@ -93,7 +97,7 @@ func (m *MQTTClient) Connect() error {
 	opts.SetClientID(m.config.Client.ClientID)
 	opts.SetCleanSession(m.config.Client.CleanSession)
 	opts.SetKeepAlive(time.Duration(m.config.Client.Keepalive) * time.Second)
-	
+
 	if m.config.Auth.Username != "" {
 		opts.SetUsername(m.config.Auth.Username)
 		opts.SetPassword(m.config.Auth.Password)
@@ -142,15 +146,17 @@ func (m *MQTTClient) onConnect(client paho.Client) {
 	defer m.mu.Unlock()
 	m.isConnected = true
 	m.reconnecting = false
-	fmt.Printf("Connected to MQTT broker at %s://%s:%d\n",
-		m.config.Broker.Protocol, m.config.Broker.Host, m.config.Broker.Port)
+	m.logger.Info("Connected to MQTT broker",
+		"protocol", m.config.Broker.Protocol,
+		"host", m.config.Broker.Host,
+		"port", m.config.Broker.Port)
 }
 
 func (m *MQTTClient) onConnectionLost(client paho.Client, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.isConnected = false
-	fmt.Printf("Connection lost to MQTT broker: %v\n", err)
+	m.logger.Info("Connection lost to MQTT broker", "error", err)
 }
 
 func (m *MQTTClient) onReconnecting(client paho.Client, opts *paho.ClientOptions) {
@@ -158,7 +164,7 @@ func (m *MQTTClient) onReconnecting(client paho.Client, opts *paho.ClientOptions
 	defer m.mu.Unlock()
 	if !m.reconnecting {
 		m.reconnecting = true
-		fmt.Println("Attempting to reconnect to MQTT broker...")
+		m.logger.Info("Attempting to reconnect to MQTT broker...")
 	}
 }
 
@@ -166,21 +172,24 @@ func (m *MQTTClient) onReconnecting(client paho.Client, opts *paho.ClientOptions
 func (m *MQTTClient) IsConnected() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.isConnected && m.client.IsConnected()
+	return m.isConnected
 }
 
 // Publish sends a message to the specified MQTT topic
 func (m *MQTTClient) Publish(topic string, payload []byte) error {
 	if !m.IsConnected() {
+		m.logger.Error("Not connected to MQTT broker")
 		return fmt.Errorf("not connected to MQTT broker")
 	}
 
 	pubConfig := m.config.Topics.Publications[0]
 	token := m.client.Publish(topic, byte(pubConfig.QoS), pubConfig.Retain, payload)
 	if !token.WaitTimeout(2 * time.Second) {
+		m.logger.Error("Publish timeout", "topic", topic)
 		return fmt.Errorf("publish timeout for topic %s", topic)
 	}
 	if err := token.Error(); err != nil {
+		m.logger.Error("Failed to publish", "topic", topic, "error", err)
 		return fmt.Errorf("failed to publish to topic %s: %w", topic, err)
 	}
 	return nil
@@ -190,9 +199,8 @@ func (m *MQTTClient) Publish(topic string, payload []byte) error {
 func (m *MQTTClient) Disconnect() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
 	if m.client != nil && m.client.IsConnected() {
-		fmt.Println("Disconnecting from MQTT broker...")
+		m.logger.Info("Disconnecting from MQTT broker...")
 		m.client.Disconnect(250)
 	}
 	m.isConnected = false

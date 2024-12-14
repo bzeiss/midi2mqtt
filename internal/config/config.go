@@ -7,14 +7,14 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
-	
+
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	MQTT  MQTTConfig `yaml:"mqtt"`
-	MIDI  MIDIConfig `yaml:"midi"`
-	Debug bool       `yaml:"debug"`
+	MQTT     MQTTConfig `yaml:"mqtt"`
+	MIDI     MIDIConfig `yaml:"midi"`
+	LogLevel string     `yaml:"log_level"`
 }
 
 type MQTTConfig struct {
@@ -44,13 +44,13 @@ type AuthConfig struct {
 }
 
 type TLSConfig struct {
-	Enabled     bool     `yaml:"enabled"`
-	VerifyCert  bool     `yaml:"verify_cert"`
-	CACert      string   `yaml:"ca_cert"`
-	ClientCert  string   `yaml:"client_cert"`
-	ClientKey   string   `yaml:"client_key"`
+	Enabled      bool     `yaml:"enabled"`
+	VerifyCert   bool     `yaml:"verify_cert"`
+	CACert       string   `yaml:"ca_cert"`
+	ClientCert   string   `yaml:"client_cert"`
+	ClientKey    string   `yaml:"client_key"`
 	CipherSuites []string `yaml:"cipher_suites"`
-	StartTLS    bool     `yaml:"starttls"`
+	StartTLS     bool     `yaml:"starttls"`
 }
 
 type TopicConfig struct {
@@ -112,7 +112,7 @@ func (c *MIDIConfig) IsEventAllowed(eventType string) bool {
 // GetConfigSearchPaths returns a list of paths to search for the config file
 func GetConfigSearchPaths() []string {
 	configName := "midi2mqtt.yaml"
-	
+
 	// Get executable directory
 	exePath, err := os.Executable()
 	exeDir := "."
@@ -168,7 +168,7 @@ func GetConfigSearchPaths() []string {
 // FindConfig searches for the config file in standard locations
 func FindConfig() (string, error) {
 	searchPaths := GetConfigSearchPaths()
-	
+
 	for _, path := range searchPaths {
 		if _, err := os.Stat(path); err == nil {
 			absPath, err := filepath.Abs(path)
@@ -178,9 +178,9 @@ func FindConfig() (string, error) {
 			return path, nil
 		}
 	}
-	
-	return "", fmt.Errorf("config file not found. Searched in:\n  %s", 
-		"\n  " + filepath.Join(searchPaths...))
+
+	return "", fmt.Errorf("config file not found. Searched in:\n  %s",
+		"\n  "+filepath.Join(searchPaths...))
 }
 
 // LoadConfig loads the configuration from the specified file

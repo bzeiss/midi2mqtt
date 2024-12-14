@@ -6,15 +6,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
-	"time"
 
 	"midi2mqtt/internal/config"
+	"midi2mqtt/internal/logging"
 	"midi2mqtt/internal/midi"
 	"midi2mqtt/internal/mqtt"
+
+	"log/slog"
 )
 
 const (
@@ -28,9 +30,34 @@ type App struct {
 	midiHandler *midi.MIDIHandler
 }
 
+func setupLogger(cfg *config.Config) {
+	// Default to info level if not specified
+	logLevel := slog.LevelInfo
+
+	// Parse log level from config
+	switch strings.ToUpper(cfg.LogLevel) {
+	case "DEBUG":
+		logLevel = slog.LevelDebug
+	case "INFO":
+		logLevel = slog.LevelInfo
+	case "WARN":
+		logLevel = slog.LevelWarn
+	case "ERROR":
+		logLevel = slog.LevelError
+	}
+
+	opts := &slog.HandlerOptions{
+		Level: logLevel,
+	}
+	
+	handler := logging.NewCustomHandler(os.Stdout, opts)
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
+}
+
 func NewApp(cfg *config.Config) (*App, error) {
 	// Create MQTT client
-	mqttClient, err := mqtt.NewMQTTClient(&cfg.MQTT)
+	mqttClient, err := mqtt.NewMQTTClient(&cfg.MQTT, slog.Default())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MQTT client: %w", err)
 	}
@@ -40,8 +67,8 @@ func NewApp(cfg *config.Config) (*App, error) {
 		if err := mqttClient.Publish(cfg.MQTT.Topics.Publications[0].Topic, data); err != nil {
 			return fmt.Errorf("failed to publish MIDI event: %w", err)
 		}
-		if cfg.Debug {
-			fmt.Print(formatEvent(data))
+		if cfg.LogLevel == "DEBUG" {
+			slog.Debug("MIDI event", "data", formatEvent(data))
 		}
 		return nil
 	})
@@ -63,12 +90,13 @@ func (a *App) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start MIDI handler: %w", err)
 	}
 
-	fmt.Printf("Started MIDI to MQTT bridge\n")
-	fmt.Printf("Listening on MIDI port: %s\n", a.cfg.MIDI.Port)
-	fmt.Printf("Publishing to MQTT topic: %s\n", a.cfg.MQTT.Topics.Publications[0].Topic)
+	slog.Info("Started MIDI to MQTT bridge")
+	slog.Info("Listening on MIDI port", "port", a.cfg.MIDI.Port)
+	slog.Info("Publishing to MQTT topic", "topic", a.cfg.MQTT.Topics.Publications[0].Topic)
 
 	// Wait for context cancellation
 	<-ctx.Done()
+	slog.Info("Shutting down gracefully...")
 	return nil
 }
 
@@ -87,7 +115,7 @@ func setupSignalHandler() (context.Context, context.CancelFunc) {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 		<-sigCh
-		fmt.Println("\nShutting down gracefully...")
+		slog.Info("Shutting down gracefully...")
 		cancel()
 	}()
 	return ctx, cancel
@@ -108,27 +136,34 @@ func main() {
 	// Load configuration for all other modes
 	configPath, err := config.FindConfig()
 	if err != nil {
-		log.Fatalf("\nConfiguration error:\n  %v\n", err)
+		slog.Error("Configuration error", "error", err)
+		os.Exit(exitCodeError)
 	}
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("\nError loading config from %s:\n  %v\n", configPath, err)
+		slog.Error("Error loading config from %s", "error", err, "path", configPath)
+		os.Exit(exitCodeError)
 	}
 
-	fmt.Printf("Using config file: %s\n", configPath)
+	slog.Info("Using config file", "path", configPath)
 
 	if *testMode {
 		if err := runTestMode(cfg); err != nil {
-			log.Fatalf("\nError running test mode:\n  %v\n", err)
+			slog.Error("Error running test mode", "error", err)
+			os.Exit(exitCodeError)
 		}
 		os.Exit(exitCodeSuccess)
 	}
 
+	// Setup logger with configured level
+	setupLogger(cfg)
+
 	// Create and start the application
 	app, err := NewApp(cfg)
 	if err != nil {
-		log.Fatalf("\nError initializing application:\n  %v\n", err)
+		slog.Error("Error initializing application", "error", err)
+		os.Exit(exitCodeError)
 	}
 	defer app.Shutdown()
 
@@ -138,7 +173,8 @@ func main() {
 
 	// Run the application
 	if err := app.Start(ctx); err != nil {
-		log.Fatalf("\nError running application:\n  %v\n", err)
+		slog.Error("Error running application", "error", err)
+		os.Exit(exitCodeError)
 	}
 }
 
@@ -148,10 +184,10 @@ func runTestMode(cfg *config.Config) error {
 		// Pretty print the JSON
 		var prettyJSON bytes.Buffer
 		if err := json.Indent(&prettyJSON, data, "", "  "); err != nil {
-			fmt.Printf("Error formatting JSON: %v\n", err)
+			slog.Error("Error formatting JSON", "error", err)
 			return nil
 		}
-		fmt.Printf("%s\n", prettyJSON.String())
+		slog.Info("Received MIDI event", "data", prettyJSON.String())
 		return nil
 	})
 	if err != nil {
@@ -160,12 +196,13 @@ func runTestMode(cfg *config.Config) error {
 	defer handler.Close()
 
 	if err := handler.Start(); err != nil {
-		return fmt.Errorf("failed to start MIDI handler: %w", err)
+		slog.Error("Error starting MIDI handler", "error", err)
+		return err
 	}
 
-	fmt.Printf("Started MIDI test mode\n")
-	fmt.Printf("Listening on MIDI port: %s\n", cfg.MIDI.Port)
-	fmt.Println("Press Ctrl+C to exit")
+	slog.Info("Started MIDI test mode")
+	slog.Info("Listening on MIDI port", "port", cfg.MIDI.Port)
+	slog.Info("Press Ctrl+C to exit")
 
 	// Wait for interrupt
 	sigCh := make(chan os.Signal, 1)
@@ -178,13 +215,13 @@ func runTestMode(cfg *config.Config) error {
 func listPorts() {
 	ports := midi.ListPorts()
 	if len(ports) == 0 {
-		fmt.Println("No MIDI input ports found")
+		slog.Info("No MIDI input ports found")
 		return
 	}
 
-	fmt.Println("Available MIDI input ports:")
+	slog.Info("Available MIDI input ports")
 	for i, port := range ports {
-		fmt.Printf("%d: %s\n", i+1, port)
+		slog.Info("Port found", "id", i+1, "name", port)
 	}
 }
 
@@ -192,7 +229,7 @@ func listPorts() {
 func formatEvent(data []byte) string {
 	var event map[string]interface{}
 	if err := json.Unmarshal(data, &event); err != nil {
-		return fmt.Sprintf("Error formatting event: %v\n", err)
+		return fmt.Sprintf("Error formatting event: %v", err)
 	}
 
 	// Safely get values with type checking
@@ -224,21 +261,12 @@ func formatEvent(data []byte) string {
 		return 0
 	}
 
-	// Get timestamp
-	timestamp := getString("timestamp")
-	t, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		t = time.Now()
-	}
-	timeStr := t.Format("15:04:05.000")
-
 	eventType := getString("event_type")
 	channel := getUint8("channel")
 
 	switch eventType {
 	case "note_on", "note_off":
-		return fmt.Sprintf("%s %s ch:%d %s%d vel:%d\n",
-			timeStr,
+		return fmt.Sprintf("%s ch:%d %s%d vel:%d",
 			eventType,
 			channel,
 			getString("key"),
@@ -246,24 +274,21 @@ func formatEvent(data []byte) string {
 			getUint8("velocity"))
 
 	case "pitch_bend":
-		return fmt.Sprintf("%s %s ch:%d value:%d\n",
-			timeStr,
+		return fmt.Sprintf("%s ch:%d value:%d",
 			eventType,
 			channel,
 			getInt16("pitch_bend"))
 
 	default:
 		if len(eventType) >= 3 && eventType[:2] == "cc" {
-			return fmt.Sprintf("%s %s ch:%d value:%d\n",
-				timeStr,
+			return fmt.Sprintf("%s ch:%d value:%d",
 				eventType,
 				channel,
 				getUint8("value"))
 		}
 
 		// Generic format for other events
-		return fmt.Sprintf("%s %s ch:%d\n",
-			timeStr,
+		return fmt.Sprintf("%s ch:%d",
 			eventType,
 			channel)
 	}
