@@ -49,7 +49,7 @@ func setupLogger(cfg *config.Config) {
 	opts := &slog.HandlerOptions{
 		Level: logLevel,
 	}
-	
+
 	handler := logging.NewCustomHandler(os.Stdout, opts)
 	logger := slog.New(handler)
 	slog.SetDefault(logger)
@@ -215,13 +215,13 @@ func runTestMode(cfg *config.Config) error {
 func listPorts() {
 	ports := midi.ListPorts()
 	if len(ports) == 0 {
-		slog.Info("No MIDI input ports found")
+		fmt.Println("No MIDI input ports found")
 		return
 	}
 
-	slog.Info("Available MIDI input ports")
+	fmt.Println("Available MIDI input ports")
 	for i, port := range ports {
-		slog.Info("Port found", "id", i+1, "name", port)
+		fmt.Println("Port found", "id", i+1, "name", port)
 	}
 }
 

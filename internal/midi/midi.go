@@ -1,8 +1,12 @@
 package midi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
 	"time"
 
 	"gitlab.com/gomidi/midi/v2"
@@ -13,10 +17,15 @@ import (
 )
 
 type MIDIHandler struct {
+	portName  string
 	port     drivers.In
 	callback func([]byte) error
 	stop     func()
 	config   *config.MIDIConfig
+	ctx      context.Context
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	isActive bool
 }
 
 type MIDIEvent struct {
@@ -43,20 +52,134 @@ func noteToKey(note uint8) (key string, octave int) {
 }
 
 func NewMIDIHandler(portName string, cfg *config.MIDIConfig, callback func([]byte) error) (*MIDIHandler, error) {
-	// Find the specified port
-	in, err := midi.FindInPort(portName)
-	if err != nil {
-		return nil, fmt.Errorf("MIDI port %s not found: %v", portName, err)
-	}
-
-	return &MIDIHandler{
-		port:     in,
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	handler := &MIDIHandler{
+		portName:  portName,
 		callback: callback,
 		config:   cfg,
-	}, nil
+		ctx:      ctx,
+		cancel:   cancel,
+	}
+
+	// Initial connection
+	if err := handler.connect(); err != nil {
+		cancel()
+		return nil, err
+	}
+
+	return handler, nil
+}
+
+func (h *MIDIHandler) connect() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Get all available ports
+	ports := midi.GetInPorts()
+	if len(ports) == 0 {
+		return fmt.Errorf("no MIDI ports found")
+	}
+
+	// Find the first port that contains the configured port name as a substring (case insensitive)
+	configuredPortName := strings.ToLower(h.portName)
+	var matchedPort drivers.In
+	for _, port := range ports {
+		if strings.Contains(strings.ToLower(port.String()), configuredPortName) {
+			matchedPort = port
+			break
+		}
+	}
+
+	if matchedPort == nil {
+		return fmt.Errorf("no MIDI port matching '%s' found", h.portName)
+	}
+
+	h.port = matchedPort
+	h.isActive = true
+	return nil
+}
+
+func (h *MIDIHandler) monitorConnection() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-h.ctx.Done():
+			return
+		case <-ticker.C:
+			h.mu.Lock()
+			if !h.isActive {
+				h.mu.Unlock()
+				continue
+			}
+			h.mu.Unlock()
+
+			// Check if port is still available
+			ports := midi.GetInPorts()
+			portFound := false
+			configuredPortName := strings.ToLower(h.portName)
+			
+			for _, port := range ports {
+				if strings.Contains(strings.ToLower(port.String()), configuredPortName) {
+					portFound = true
+					break
+				}
+			}
+
+			if !portFound {
+				h.mu.Lock()
+				h.isActive = false
+				if h.stop != nil {
+					h.stop()
+					h.stop = nil
+				}
+				h.mu.Unlock()
+				
+				slog.Error("MIDI port disconnected", "port", h.portName)
+
+				// Try to reconnect
+				go h.reconnect()
+			}
+		}
+	}
+}
+
+func (h *MIDIHandler) reconnect() {
+	backoff := time.Second
+	maxBackoff := 30 * time.Second
+
+	for {
+		select {
+		case <-h.ctx.Done():
+			return
+		case <-time.After(backoff):
+			if err := h.connect(); err == nil {
+				// Successfully reconnected
+				if err := h.Start(); err == nil {
+					slog.Info("MIDI port reconnected", "port", h.portName)
+					return
+				}
+			}
+
+			// Increase backoff time
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
 }
 
 func (h *MIDIHandler) Start() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if !h.isActive {
+		return fmt.Errorf("MIDI handler is not active")
+	}
+
 	var err error
 	h.stop, err = midi.ListenTo(h.port, func(msg midi.Message, timestampms int32) {
 		var event *MIDIEvent
@@ -92,7 +215,6 @@ func (h *MIDIHandler) Start() error {
 			eventType = "pitch_bend"
 			event = &baseEvent
 
-		// Note: GetAfterTouch is the equivalent of Channel Pressure in gomidi v2
 		case msg.GetAfterTouch(&baseEvent.Channel, &baseEvent.Value):
 			eventType = "channel_pressure"
 			event = &baseEvent
@@ -108,15 +230,20 @@ func (h *MIDIHandler) Start() error {
 
 			jsonData, err := json.Marshal(event)
 			if err != nil {
-				fmt.Printf("Error marshaling MIDI event: %v\n", err)
+				slog.Error("Error marshaling MIDI event", "error", err)
 				return
 			}
 
 			if err := h.callback(jsonData); err != nil {
-				fmt.Printf("Error handling MIDI event: %v\n", err)
+				slog.Error("Error handling MIDI event", "error", err)
 			}
 		}
 	})
+
+	if err == nil {
+		// Start the connection monitor
+		go h.monitorConnection()
+	}
 
 	return err
 }
@@ -131,9 +258,12 @@ func ListPorts() []string {
 }
 
 func (h *MIDIHandler) Close() error {
+	h.cancel() // Stop the monitor
+	h.mu.Lock()
 	if h.stop != nil {
 		h.stop()
 	}
+	h.mu.Unlock()
 	midi.CloseDriver()
 	return nil
 }
