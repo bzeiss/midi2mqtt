@@ -14,7 +14,13 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update && \
   apt-get upgrade -y && \
   useradd -m docker && \
-  apt-get install -y --no-install-recommends curl ca-certificates libicu74 libasound2-dev librtmidi-dev build-essential git && \
+  apt-get install -y --no-install-recommends curl ca-certificates libicu74 libasound2-dev librtmidi-dev build-essential git gpg && \
+  # Install GitHub CLI
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+  echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+  apt-get update && \
+  apt-get install -y gh && \
+  # Continue with runner setup
   mkdir -p /opt/hostedtoolcache /home/docker/actions-runner && \
   curl -L https://github.com/actions/runner/releases/download/v${GH_RUNNER_VERSION}/actions-runner-${GH_RUNNER_PLATFORM}-${GH_RUNNER_VERSION}.tar.gz -o /home/docker/actions-runner/actions-runner.tar.gz && \
   tar xzf /home/docker/actions-runner/actions-runner.tar.gz -C /home/docker/actions-runner && \
@@ -29,3 +35,4 @@ CMD if [ -z "$TOKEN" ]; then echo 'TOKEN is not set'; exit 1; fi && \
   if [ -z "$RUNNER_NAME" ]; then echo 'RUNNER_NAME is not set'; exit 1; fi && \
   ./config.sh --url "${RUNNER_URL}" --token "${TOKEN}" --name "${RUNNER_NAME}" --work "_work" --labels "${LABELS}" --runnergroup "${RUNNER_GROUP}" --unattended --ephemeral && \
   ./run.sh
+
