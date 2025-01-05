@@ -77,10 +77,10 @@ jobs:
       if: success()
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        PATH: ${{ env.USERPROFILE }}\AppData\Local\Programs\Git\cmd;${{ runner.temp }}\msys64\mingw64\bin;${{ env.PATH }}
+        PATH: C:\Users\github-runner\AppData\Local\Programs\Git\cmd;${{ runner.temp }}\msys64\mingw64\bin;${{ env.PATH }}
       run: |
-        git tag -f prerelease-windows
-        git push origin prerelease-windows --force
+        git.exe tag -f prerelease-windows
+        git.exe push origin prerelease-windows --force
       
   build-linux-amd64:
     runs-on: midi2mqtt-builder-linux
