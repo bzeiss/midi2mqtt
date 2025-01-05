@@ -21,7 +21,15 @@ jobs:
     steps:   
     - uses: actions/checkout@v4
 
+    - name: MSYS2 cache
+      id: cache-msys2
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}\msys64
+        key: msys2-mingw64-gcc-${{ hashFiles('**/go.mod') }}
+
     - name: Setup MSYS2
+      if: steps.cache-msys2.outputs.cache-hit != 'true'
       uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64
