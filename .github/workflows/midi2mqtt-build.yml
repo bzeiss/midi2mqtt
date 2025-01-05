@@ -30,6 +30,12 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-pkg-config
 
+    - name: Check MSYS2 location
+      run: |
+        Get-ChildItem -Path C:\ -Recurse -Filter "gcc.exe" -ErrorAction SilentlyContinue
+        Write-Host "Current directory: $PWD"
+        $env:Path -split ';'
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
