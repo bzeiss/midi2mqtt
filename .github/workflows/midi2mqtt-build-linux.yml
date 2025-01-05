@@ -46,12 +46,11 @@ jobs:
 
     - name: Package Linux Binary
       run: |
-        VERSION_TAG=${SHORT_SHA:0:7}
         mkdir -p release/midi2mqtt-linux-amd64
         cp target/linux-amd64/midi2mqtt release/midi2mqtt-linux-amd64/
         cp midi2mqtt.yaml.template release/midi2mqtt-linux-amd64/midi2mqtt.yaml
         cd release
-        tar czf "midi2mqtt-linux-amd64-${VERSION_TAG}.tar.gz" midi2mqtt-linux-amd64/
+        tar czf "midi2mqtt-linux-amd64-${{ env.SHORT_SHA }}.tar.gz" midi2mqtt-linux-amd64/
 
     - name: Create Prerelease
       uses: softprops/action-gh-release@v1
@@ -61,3 +60,4 @@ jobs:
         draft: false
         name: "Development Build ${{ env.SHORT_SHA }}"
         tag_name: "prerelease-${{ env.SHORT_SHA }}"
+        token: ${{ secrets.GITHUB_TOKEN }}
