@@ -16,6 +16,8 @@ jobs:
 
   build:
     runs-on: midi2mqtt-builder-linux
+    env:
+      SHORT_SHA: ${{ github.sha }}
     steps:
     - uses: actions/checkout@v4
 
@@ -44,7 +46,7 @@ jobs:
 
     - name: Package Linux Binary
       run: |
-        VERSION_TAG="${{ github.sha::7 }}"
+        VERSION_TAG=${SHORT_SHA:0:7}
         mkdir -p release/midi2mqtt-linux-amd64
         cp target/linux-amd64/midi2mqtt release/midi2mqtt-linux-amd64/
         cp midi2mqtt.yaml.template release/midi2mqtt-linux-amd64/midi2mqtt.yaml
@@ -54,9 +56,8 @@ jobs:
     - name: Create Prerelease
       uses: softprops/action-gh-release@v1
       with:
-        files: release/midi2mqtt-linux-amd64-${{ github.sha::7 }}.tar.gz
+        files: release/midi2mqtt-linux-amd64-${{ env.SHORT_SHA }}.tar.gz
         prerelease: true
         draft: false
-        name: "Development Build ${{ github.sha::7 }}"
-        tag_name: "prerelease-${{ github.sha::7 }}"
-        token: ${{ secrets.GITHUB_TOKEN }}
+        name: "Development Build ${{ env.SHORT_SHA }}"
+        tag_name: "prerelease-${{ env.SHORT_SHA }}"
