@@ -14,7 +14,7 @@ on:
 
 jobs:
 
-  build-windows:
+  build-windows-amd64:
     runs-on: midi2mqtt-builder-win64
     env:
       SHORT_SHA: ${{ github.sha }}
@@ -27,15 +27,44 @@ jobs:
         go-version: '1.23.4'
         
     - name: Build for windows-amd64
-      run: GO111MODULE=on GOOS=windows GOARCH=amd64 go build -o target/windows-amd64/midi2mqtt.exe ./cmd/main.go
+      env:
+        GO111MODULE: on
+        GOOS: windows
+        GOARCH: amd64
+      run: go build -o target/windows-amd64/midi2mqtt.exe ./cmd/main.go
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries
         path: target/
+
+    - name: Package Windows Binary
+      run: |
+        mkdir -Force release\midi2mqtt-windows-amd64
+        copy target\windows-amd64\midi2mqtt.exe release\midi2mqtt-windows-amd64\
+        copy midi2mqtt.yaml.template release\midi2mqtt-windows-amd64\midi2mqtt.yaml
+        Compress-Archive -Path release\midi2mqtt-windows-amd64 -DestinationPath release\midi2mqtt-windows-amd64-latest.zip -Force
+        
+    - name: Create Prerelease
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/midi2mqtt-windows-amd64-latest.zip
+        prerelease: true
+        draft: false
+        name: "Development Build Windows"
+        tag_name: prerelease-windows
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Clean up old prerelease
+      if: success()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git tag -f prerelease-windows
+        git push origin prerelease-windows --force
       
-  build-linux:
+  build-linux-amd64:
     runs-on: midi2mqtt-builder-linux
     env:
       SHORT_SHA: ${{ github.sha }}
