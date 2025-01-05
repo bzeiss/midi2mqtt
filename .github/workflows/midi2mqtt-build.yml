@@ -44,11 +44,11 @@ jobs:
         PATH: ${{ runner.temp }}\msys64\mingw64\bin;${{ env.PATH }}
       run: go build -o target/windows-amd64/midi2mqtt.exe ./cmd/main.go
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: binaries-${{ github.run_id }}
-        path: target/
+#    - name: Upload artifacts
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: binaries-${{ github.run_id }}
+#        path: target/
 
     - name: Package Windows Binary
       run: |
@@ -100,11 +100,11 @@ jobs:
 #    - name: Build for darwin-amd64
 #      run: GO111MODULE=on GOOS=darwin GOARCH=amd64 go build -o target/darwin-amd64/midi2mqtt ./cmd/main.go
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: binaries-${{ github.run_id }}
-        path: target/
+#    - name: Upload artifacts
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: binaries-${{ github.run_id }}
+#        path: target/
 
     - name: Package Linux Binary
       run: |
