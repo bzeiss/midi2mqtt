@@ -20,7 +20,12 @@ jobs:
       SHORT_SHA: ${{ github.sha }}
     steps:   
     - uses: actions/checkout@v4
-    
+
+    - name: Set up MinGW
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x64
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
@@ -31,6 +36,7 @@ jobs:
         GO111MODULE: on
         GOOS: windows
         GOARCH: amd64
+        CGO_ENABLED: 1        
       run: go build -o target/windows-amd64/midi2mqtt.exe ./cmd/main.go
 
     - name: Upload artifacts
