@@ -14,7 +14,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update && \
   apt-get upgrade -y && \
   useradd -m docker && \
-  apt-get install -y --no-install-recommends curl ca-certificates libicu74 && \
+  apt-get install -y --no-install-recommends curl ca-certificates libicu74 libasound2-dev librtmidi-dev build-essential git && \
   mkdir -p /opt/hostedtoolcache /home/docker/actions-runner && \
   curl -L https://github.com/actions/runner/releases/download/v${GH_RUNNER_VERSION}/actions-runner-${GH_RUNNER_PLATFORM}-${GH_RUNNER_VERSION}.tar.gz -o /home/docker/actions-runner/actions-runner.tar.gz && \
   tar xzf /home/docker/actions-runner/actions-runner.tar.gz -C /home/docker/actions-runner && \
