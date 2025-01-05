@@ -12,7 +12,7 @@ on:
 jobs:
 
   build:
-    runs-on: build-midi2mqtt-01
+    runs-on: midi2mqtt-builder
     steps:
     - uses: actions/checkout@v4
 
