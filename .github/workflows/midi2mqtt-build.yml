@@ -74,17 +74,12 @@ jobs:
         name: "Development Build Windows"
         tag_name: prerelease-windows
         token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Add Git to PATH
-      shell: powershell
-      run: |
-        $env:PATH = "$HOME\AppData\Local\Programs\Git\cmd;$env:PATH"
-        git --version # Verify Git is accessible
-        
+      
     - name: Clean up old prerelease
       if: success()
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PATH: ${{ env.USERPROFILE }}\AppData\Local\Programs\Git\cmd;${{ runner.temp }}\msys64\mingw64\bin;${{ env.PATH }}
       run: |
         git tag -f prerelease-windows
         git push origin prerelease-windows --force
