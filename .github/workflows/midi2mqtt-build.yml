@@ -30,12 +30,6 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-pkg-config
 
-    - name: Check MSYS2 location
-      run: |
-        Get-ChildItem -Path C:\ -Recurse -Filter "gcc.exe" -ErrorAction SilentlyContinue
-        Write-Host "Current directory: $PWD"
-        $env:Path -split ';'
-
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
@@ -46,7 +40,8 @@ jobs:
         GO111MODULE: on
         GOOS: windows
         GOARCH: amd64
-        CGO_ENABLED: 1        
+        CGO_ENABLED: 1
+        PATH: ${{ runner.temp }}\msys64\mingw64\bin;${{ env.PATH }}
       run: go build -o target/windows-amd64/midi2mqtt.exe ./cmd/main.go
 
     - name: Upload artifacts
