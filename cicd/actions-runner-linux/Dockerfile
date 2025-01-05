@@ -33,6 +33,6 @@ WORKDIR /home/docker/actions-runner
 
 CMD if [ -z "$TOKEN" ]; then echo 'TOKEN is not set'; exit 1; fi && \
   if [ -z "$RUNNER_NAME" ]; then echo 'RUNNER_NAME is not set'; exit 1; fi && \
-  ./config.sh --url "${RUNNER_URL}" --token "${TOKEN}" --name "${RUNNER_NAME}" --work "_work" --labels "${LABELS}" --runnergroup "${RUNNER_GROUP}" --unattended --ephemeral && \
+  ./config.sh --url "${RUNNER_URL}" --token "${TOKEN}" --name "${RUNNER_NAME}" --work "_work" --labels "${LABELS}" --runnergroup "${RUNNER_GROUP}" --unattended && \
   ./run.sh
 

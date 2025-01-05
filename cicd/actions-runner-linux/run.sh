@@ -51,7 +51,7 @@ RUNNER_NUM=$(printf "%02d" "$1")
 # Run docker container with provided arguments
 docker run -d \
    --name "build-midi2mqtt-linux-${RUNNER_NUM}" \
-   --restart always \
+   --restart=always \
    -e "LABELS=self-hosted,AMD64,Linux,midi2mqtt-builder-linux" \
    -e "RUNNER_NAME=build-midi2mqtt-linux-${RUNNER_NUM}" \
    -e "TOKEN=$2" \
