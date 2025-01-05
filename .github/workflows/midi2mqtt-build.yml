@@ -1,0 +1,37 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: midi2mqtt-build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: build-midi2mqtt-01
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23.4'
+
+    - name: Build for Linux
+      run: GO111MODULE=on GOOS=linux GOARCH=amd64 go build -v -o target/linux-amd64/midi2mqtt ./cmd/main.go
+    - name: Build for Win64
+      run: GO111MODULE=on GOOS=windows GOARCH=amd64 go build -v -o target/windows-amd64/midi2mqtt ./cmd/main.go
+    - name: Build for macOS arm64
+      run: GO111MODULE=on GOOS=darwin GOARCH=arm64 go build -v -o target/darwin-arm64/midi2mqtt ./cmd/main.go
+    - name: Build for macOS amd64
+      run: GO111MODULE=on GOOS=darwin GOARCH=amd64 go build -v -o target/darwin-amd64/midi2mqtt ./cmd/main.go
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: target/
