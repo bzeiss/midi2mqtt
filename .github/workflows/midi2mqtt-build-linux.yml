@@ -58,8 +58,8 @@ jobs:
         files: release/midi2mqtt-linux-amd64-latest.tar.gz
         prerelease: true
         draft: false
-        name: "Development Build"
-        tag_name: "prerelease-new"
+        name: "Development Build Linux"
+        tag_name: prerelease-linux
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Clean up old prerelease
@@ -67,10 +67,6 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        # Try to delete old release if it exists
-        gh release delete "prerelease" --yes || true
-        # Delete old tag if it exists
-        git push origin :refs/tags/prerelease || true
         # Create and push new tag directly
-        git tag -f prerelease
-        git push origin prerelease --force
+        git tag -f prerelease-linux
+        git push origin prerelease-linux --force
