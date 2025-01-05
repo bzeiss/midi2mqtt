@@ -20,8 +20,8 @@ jobs:
       SHORT_SHA: ${{ github.sha }}
     steps:   
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      env:
+        PATH: C:\Users\github-runner\AppData\Local\Programs\Git\cmd;${{ env.PATH }}
         
     - name: Setup MSYS2
       uses: msys2/setup-msys2@v2
