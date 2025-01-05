@@ -23,15 +23,15 @@ jobs:
       env:
         PATH: C:\Users\github-runner\AppData\Local\Programs\Git\cmd;${{ env.PATH }}
         
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: UCRT64
-        update: true
-        cache: true
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-pkg-config
+#    - name: Setup MSYS2
+#      uses: msys2/setup-msys2@v2
+#      with:
+#        msystem: UCRT64
+#        update: true
+#        cache: true
+#        install: >-
+#          mingw-w64-x86_64-gcc
+#          mingw-w64-x86_64-pkg-config
 
     - name: Set up Go
       uses: actions/setup-go@v4
@@ -44,7 +44,7 @@ jobs:
         GOOS: windows
         GOARCH: amd64
         CGO_ENABLED: 1
-        PATH: ${{ runner.temp }}\msys64\mingw64\bin;${{ env.PATH }}
+        PATH: C:\msys64\ucrt64\bin;${{ env.PATH }}
       run: go build -o target/windows-amd64/midi2mqtt.exe ./cmd/main.go
 
 #    - name: Upload artifacts
@@ -70,11 +70,6 @@ jobs:
         tag_name: prerelease-windows
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Debug USERPROFILE
-      shell: powershell
-      run: |
-        echo "USERPROFILE is: $env:USERPROFILE"
-        
     - name: Clean up old prerelease
       if: success()
       env:
