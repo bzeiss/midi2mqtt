@@ -50,14 +50,26 @@ jobs:
         cp target/linux-amd64/midi2mqtt release/midi2mqtt-linux-amd64/
         cp midi2mqtt.yaml.template release/midi2mqtt-linux-amd64/midi2mqtt.yaml
         cd release
-        tar czf "midi2mqtt-linux-amd64-${{ env.SHORT_SHA }}.tar.gz" midi2mqtt-linux-amd64/
+        tar czf "midi2mqtt-linux-amd64-latest.tar.gz" midi2mqtt-linux-amd64/
 
     - name: Create Prerelease
       uses: softprops/action-gh-release@v1
       with:
-        files: release/midi2mqtt-linux-amd64-${{ env.SHORT_SHA }}.tar.gz
+        files: release/midi2mqtt-linux-amd64-latest.tar.gz
         prerelease: true
         draft: false
-        name: "Development Build ${{ env.SHORT_SHA }}"
-        tag_name: "prerelease-${{ env.SHORT_SHA }}"
+        name: "Development Build"
+        tag_name: "prerelease-new"
         token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Clean up old prerelease
+      if: success()  # Only run if the new release was created successfully
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Delete old prerelease if it exists
+        gh release delete "prerelease" --yes || true
+        git push origin :refs/tags/prerelease || true
+        # Rename new tag to be the permanent one
+        git push origin refs/tags/prerelease-new:refs/tags/prerelease
+        git push origin :refs/tags/prerelease-new
