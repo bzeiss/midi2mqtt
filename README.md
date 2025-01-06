@@ -22,7 +22,7 @@ One of the main use cases is integrating MIDI controllers with Home Assistant, a
 - Monitoring MIDI events for automation triggers
 
 ## Binaries
-There currently are pre-release binaries available for windows-amd64 and linux-amd64. These are updated each time something is comitted/merged into main, so these are not stable releases yet, but you are welcome to test them. MacOS builds may or may not follow. Due to the use of rtmidi, cross-compilation isn't easily possible and I currently don't have a mac available.
+There currently are pre-release binaries available for windows-amd64 (statically linked), linux-amd64 (dynamically linked, built on ubuntu 20.04 for backward compatibility) and macos (universal, should be compatible from macos 11 big sur or later). These are updated each time something is comitted/merged into main, so these are not stable releases yet, but you are welcome to test them.
 
 ## Usage
 
