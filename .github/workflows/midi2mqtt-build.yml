@@ -92,17 +92,8 @@ jobs:
         go-version: '1.23.4'
 
     - name: Build for linux-amd64
-      run: GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o target/linux-amd64/midi2mqtt ./cmd/main.go
-      
-#    - name: Build for windows-amd64
-#      run: GO111MODULE=on GOOS=windows GOARCH=amd64 go build -o target/windows-amd64/midi2mqtt ./cmd/main.go
-#    - name: Build for windows-arm64
-#      run: GO111MODULE=on GOOS=windows GOARCH=arm64 go build -o target/windows-arm64/midi2mqtt ./cmd/main.go
-#    - name: Build for darwin-arm64
-#      run: GO111MODULE=on GOOS=darwin GOARCH=arm64 go build -o target/darwin-arm64/midi2mqtt ./cmd/main.go
-#    - name: Build for darwin-amd64
-#      run: GO111MODULE=on GOOS=darwin GOARCH=amd64 go build -o target/darwin-amd64/midi2mqtt ./cmd/main.go
-
+      run: GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o target/linux-amd64/midi2mqtt -ldflags "-extldflags '-static'" ./cmd/main.go
+     
 #    - name: Upload artifacts
 #      uses: actions/upload-artifact@v4
 #      with:
@@ -135,3 +126,54 @@ jobs:
         # Create and push new tag directly
         git tag -f prerelease-linux
         git push origin prerelease-linux --force
+
+  build-macos-universal:
+    runs-on: midi2mqtt-builder-macos
+    env:
+      SHORT_SHA: ${{ github.sha }}
+    steps:   
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23.4'
+
+    - name: Build for macOS Intel (amd64)
+      run: |
+        GO111MODULE=on CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -o target/darwin-amd64/midi2mqtt -ldflags "-extldflags '-static'" ./cmd/main.go
+
+    - name: Build for macOS Apple Silicon (arm64)
+      run: |
+        GO111MODULE=on CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -o target/darwin-arm64/midi2mqtt -ldflags "-extldflags '-static'" ./cmd/main.go
+
+    - name: Create Universal Binary
+      run: |
+        mkdir -p target/darwin-universal
+        lipo -create -output target/darwin-universal/midi2mqtt target/darwin-amd64/midi2mqtt target/darwin-arm64/midi2mqtt
+
+    - name: Package macOS Binary
+      run: |
+        mkdir -p release/midi2mqtt-macos
+        cp target/darwin-universal/midi2mqtt release/midi2mqtt-macos/
+        cp midi2mqtt.yaml.template release/midi2mqtt-macos/midi2mqtt.yaml
+        cd release
+        zip -r "midi2mqtt-macos-universal-latest.zip" midi2mqtt-macos/
+
+    - name: Create Prerelease
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/midi2mqtt-macos-universal-latest.zip
+        prerelease: true
+        draft: false
+        name: "Development Build macOS (Universal)"
+        tag_name: prerelease-macos
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Clean up old prerelease
+      if: success()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git tag -f prerelease-macos
+        git push origin prerelease-macos --force
