@@ -1,5 +1,5 @@
 # ubuntu image is pinned to a specific repo digest. we'll update the image in a controlled and tested manner so that nothing brakes.
-FROM ubuntu@sha256:80dd3c3b9c6cecb9f1667e9290b3bc61b78c2678c02cbdae5f0fea92cc6734ab
+FROM ubuntu:focal
 
 ENV TOKEN=
 ENV RUNNER_NAME=
@@ -14,7 +14,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update && \
   apt-get upgrade -y && \
   useradd -m docker && \
-  apt-get install -y --no-install-recommends curl ca-certificates libicu74 libasound2-dev librtmidi-dev build-essential git gpg && \
+  apt-get install -y --no-install-recommends curl ca-certificates libasound2-dev librtmidi-dev build-essential git gpg && \
   # Install GitHub CLI
   curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg && \
   echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
