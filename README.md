@@ -88,59 +88,11 @@ The first file found in this order will be used. The program will display which 
 
 The configuration file uses YAML format and supports the following settings:
 
-```yaml
-mqtt:
-  # Broker connection settings
-  broker:
-    host: localhost
-    port: 1883
-    protocol: tcp  # tcp or ssl
-
-  # Client settings
-  client:
-    client_id: midi2mqtt
-    clean_session: true
-    keepalive: 30
-
-  # Authentication (optional)
-  auth:
-    username: ""
-    password: ""
-
-  # TLS/SSL settings (optional)
-  tls:
-    enabled: false
-    verify_cert: true
-    ca_cert: ""
-    client_cert: ""
-    client_key: ""
-
-  # Topics configuration
-  topics:
-    publications:
-      - topic: "midi/events"
-        qos: 0
-        retain: false
-
-  # Connection behavior
-  connection:
-    retry_interval: 10 # Will retry every 10 seconds
-    timeout: 30 # Will timeout after 30 seconds
-
-midi:
-  # MIDI port configuration
-  port: "Arturia KeyLab mkII"  # Port name or leave empty for first available
-  event_types:  # List of MIDI events to capture
-    - note_on
-    - note_off
-    - control_change
-    - pitch_bend
-    - program_change
-```
+For a complete configuration example with all available options and their descriptions, please refer to the [`midi2mqtt.yaml.template`](midi2mqtt.yaml.template) file included in this repository.
 
 ## Home Assistant Integration
 
-To integrate MIDI events into Home Assistant, add a configuration such as the following to your `configuration.yaml`:
+For mqtt events of publication type custom_json, to these MIDI events into Home Assistant, add a configuration such as the following to your `configuration.yaml`:
 
 ```yaml
 mqtt:
@@ -170,6 +122,8 @@ This configuration creates a sensor that:
 - Stores all event details as attributes
 - Updates in real-time as MIDI events occur
 - Can be used in automations and scripts
+
+A more easy to use publication type for home assistant with mqtt discovery will be included in a future release.
 
 ### Creating Automations in Home Assistant
 

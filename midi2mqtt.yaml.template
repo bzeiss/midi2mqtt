@@ -1,41 +1,44 @@
-mqtt:
-  # Basic connection settings
+mqtt_server:
+  # MQTT Broker Configuration
   broker:
-    host: "127.0.0.1"
+    host: "localhost"
     port: 1883
     protocol: "mqtt"  # mqtt, mqtts, ws, wss
-    
-  # Client settings
+
+  # Client Configuration
   client:
-    client_id: "midi2mqtt-client"
+    client_id: "midi2mqtt"
     clean_session: true
     keepalive: 60
-    
-  # Authentication
+
+  # Authentication Configuration
   auth:
     username: ""
     password: ""
-    
-  # TLS/SSL Configuration
+
+  # TLS Configuration
   tls:
     enabled: false
     verify_cert: true
-    ca_cert: "/path/to/ca.crt"
-    client_cert: "/path/to/client.crt"
-    client_key: "/path/to/client.key"
+    ca_cert: ""
+    client_cert: ""
+    client_key: ""
+    cipher_suites: []
     starttls: false
-    
-  # Topic Configuration
-  topics:
-    publications:
-      - topic: "midi/events"
-        qos: 1
-        retain: false
-        
-  # Connection behavior
+
+  # Connection Configuration
   connection:
-    retry_interval: 10 # Will retry every 10 seconds
-    timeout: 30 # Will timeout after 30 seconds
+    retry_interval: 10
+    max_retries: 3
+    timeout: 30
+
+# MQTT Publication Configuration
+mqtt_publications:
+  - type: custom_json
+    enabled: true
+    topic: "midi/events"
+    qos: 1
+    retain: false
 
 midi:
   # MIDI port configuration

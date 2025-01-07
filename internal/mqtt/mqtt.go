@@ -17,7 +17,8 @@ import (
 // MQTTClient represents an MQTT client with connection management
 type MQTTClient struct {
 	client       paho.Client
-	config       *config.MQTTConfig
+	mqttConfig   *config.MQTTConfig
+	rootConfig   *config.Config
 	mu           sync.RWMutex
 	isConnected  bool
 	reconnecting bool
@@ -25,10 +26,11 @@ type MQTTClient struct {
 }
 
 // NewMQTTClient creates a new MQTT client and establishes a connection
-func NewMQTTClient(cfg *config.MQTTConfig, logger *slog.Logger) (*MQTTClient, error) {
+func NewMQTTClient(cfg *config.Config, logger *slog.Logger) (*MQTTClient, error) {
 	m := &MQTTClient{
-		config: cfg,
-		logger: logger,
+		mqttConfig: &cfg.MQTT,
+		rootConfig: cfg,
+		logger:     logger,
 	}
 
 	if err := m.Connect(); err != nil {
@@ -40,13 +42,13 @@ func NewMQTTClient(cfg *config.MQTTConfig, logger *slog.Logger) (*MQTTClient, er
 
 func (m *MQTTClient) setupTLSConfig() (*tls.Config, error) {
 	tlsConfig := &tls.Config{
-		InsecureSkipVerify: !m.config.TLS.VerifyCert,
+		InsecureSkipVerify: !m.mqttConfig.TLS.VerifyCert,
 		MinVersion:         tls.VersionTLS12,
 	}
 
 	// Load CA certificate if provided
-	if m.config.TLS.CACert != "" {
-		caCert, err := os.ReadFile(m.config.TLS.CACert)
+	if m.mqttConfig.TLS.CACert != "" {
+		caCert, err := os.ReadFile(m.mqttConfig.TLS.CACert)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
 		}
@@ -59,8 +61,8 @@ func (m *MQTTClient) setupTLSConfig() (*tls.Config, error) {
 	}
 
 	// Load client certificate and key if provided
-	if m.config.TLS.ClientCert != "" && m.config.TLS.ClientKey != "" {
-		cert, err := tls.LoadX509KeyPair(m.config.TLS.ClientCert, m.config.TLS.ClientKey)
+	if m.mqttConfig.TLS.ClientCert != "" && m.mqttConfig.TLS.ClientKey != "" {
+		cert, err := tls.LoadX509KeyPair(m.mqttConfig.TLS.ClientCert, m.mqttConfig.TLS.ClientKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load client certificate/key: %w", err)
 		}
@@ -80,11 +82,11 @@ func (m *MQTTClient) Connect() error {
 	}
 
 	opts := paho.NewClientOptions()
-	broker := fmt.Sprintf("%s://%s:%d", m.config.Broker.Protocol, m.config.Broker.Host, m.config.Broker.Port)
+	broker := fmt.Sprintf("%s://%s:%d", m.mqttConfig.Broker.Protocol, m.mqttConfig.Broker.Host, m.mqttConfig.Broker.Port)
 	opts.AddBroker(broker)
 
 	// Setup TLS if enabled
-	if m.config.TLS.Enabled {
+	if m.mqttConfig.TLS.Enabled {
 		tlsConfig, err := m.setupTLSConfig()
 		if err != nil {
 			return fmt.Errorf("TLS setup failed:\n  %w", err)
@@ -93,13 +95,13 @@ func (m *MQTTClient) Connect() error {
 	}
 
 	// Set client options
-	opts.SetClientID(m.config.Client.ClientID)
-	opts.SetCleanSession(m.config.Client.CleanSession)
-	opts.SetKeepAlive(time.Duration(m.config.Client.Keepalive) * time.Second)
+	opts.SetClientID(m.mqttConfig.Client.ClientID)
+	opts.SetCleanSession(m.mqttConfig.Client.CleanSession)
+	opts.SetKeepAlive(time.Duration(m.mqttConfig.Client.Keepalive) * time.Second)
 
-	if m.config.Auth.Username != "" {
-		opts.SetUsername(m.config.Auth.Username)
-		opts.SetPassword(m.config.Auth.Password)
+	if m.mqttConfig.Auth.Username != "" {
+		opts.SetUsername(m.mqttConfig.Auth.Username)
+		opts.SetPassword(m.mqttConfig.Auth.Password)
 	}
 
 	// Set initial connection timeouts without retries
@@ -129,7 +131,7 @@ func (m *MQTTClient) Connect() error {
 	// Now set up the persistent connection with retries
 	opts.SetConnectRetry(true)
 	opts.SetAutoReconnect(true)
-	opts.SetMaxReconnectInterval(time.Duration(m.config.Connection.RetryInterval) * time.Second)
+	opts.SetMaxReconnectInterval(time.Duration(m.mqttConfig.Connection.RetryInterval) * time.Second)
 	opts.SetResumeSubs(true)
 
 	// Set connection handlers for the persistent connection
@@ -159,9 +161,9 @@ func (m *MQTTClient) onConnect(client paho.Client) {
 	m.isConnected = true
 	m.reconnecting = false
 	m.logger.Info("Connected to MQTT broker",
-		"protocol", m.config.Broker.Protocol,
-		"host", m.config.Broker.Host,
-		"port", m.config.Broker.Port)
+		"protocol", m.mqttConfig.Broker.Protocol,
+		"host", m.mqttConfig.Broker.Host,
+		"port", m.mqttConfig.Broker.Port)
 }
 
 func (m *MQTTClient) onConnectionLost(client paho.Client, err error) {
@@ -187,15 +189,14 @@ func (m *MQTTClient) IsConnected() bool {
 	return m.isConnected
 }
 
-// Publish sends a message to the specified MQTT topic
-func (m *MQTTClient) Publish(topic string, payload []byte) error {
+// publishToTopic is a helper function that handles the actual MQTT publish operation
+func (m *MQTTClient) publishToTopic(topic string, qos byte, retain bool, payload []byte) error {
 	if !m.IsConnected() {
 		m.logger.Error("Not connected to MQTT broker")
 		return fmt.Errorf("not connected to MQTT broker")
 	}
 
-	pubConfig := m.config.Topics.Publications[0]
-	token := m.client.Publish(topic, byte(pubConfig.QoS), pubConfig.Retain, payload)
+	token := m.client.Publish(topic, qos, retain, payload)
 	if !token.WaitTimeout(2 * time.Second) {
 		m.logger.Error("Publish timeout", "topic", topic)
 		return fmt.Errorf("publish timeout for topic %s", topic)
@@ -205,6 +206,56 @@ func (m *MQTTClient) Publish(topic string, payload []byte) error {
 		return fmt.Errorf("failed to publish to topic %s: %w", topic, err)
 	}
 	return nil
+}
+
+// PublishToAll publishes a message to all enabled publications
+func (m *MQTTClient) PublishToAll(payload []byte) error {
+	var lastErr error
+
+	// Try publishing to all enabled publications
+	for i := range m.rootConfig.MQTTPublications {
+		pub := &m.rootConfig.MQTTPublications[i]
+		if !pub.Enabled {
+			continue
+		}
+
+		var err error
+		switch pub.Type {
+		case config.PublicationTypeCustomJSON:
+			err = m.PublishCustomJSON(payload, pub)
+		case config.PublicationTypeHomeAssistant:
+			err = m.PublishHomeAssistant(payload, pub)
+		default:
+			m.logger.Warn("Unknown publication type", "type", pub.Type)
+			continue
+		}
+
+		if err != nil {
+			lastErr = err
+			m.logger.Error("Failed to publish", "type", pub.Type, "error", err)
+		}
+	}
+
+	return lastErr
+}
+
+// PublishCustomJSON publishes a message using the custom JSON publication configuration
+func (m *MQTTClient) PublishCustomJSON(payload []byte, pub *config.PublicationConfig) error {
+	m.logger.Debug("Publishing to custom_json topic",
+		"topic", pub.Topic,
+		"qos", pub.QoS,
+		"retain", pub.Retain)
+	return m.publishToTopic(pub.Topic, byte(pub.QoS), pub.Retain, payload)
+}
+
+// PublishHomeAssistant publishes a message using the Home Assistant publication configuration
+func (m *MQTTClient) PublishHomeAssistant(payload []byte, pub *config.PublicationConfig) error {
+	m.logger.Debug("Publishing to home_assistant topic",
+		"topic", pub.Topic,
+		"qos", pub.QoS,
+		"retain", pub.Retain)
+	// TODO: Implement Home Assistant specific payload formatting if needed
+	return m.publishToTopic(pub.Topic, byte(pub.QoS), pub.Retain, payload)
 }
 
 // Disconnect cleanly disconnects from the MQTT broker

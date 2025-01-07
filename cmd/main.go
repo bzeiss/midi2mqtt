@@ -57,14 +57,14 @@ func setupLogger(cfg *config.Config) {
 
 func NewApp(cfg *config.Config) (*App, error) {
 	// Create MQTT client
-	mqttClient, err := mqtt.NewMQTTClient(&cfg.MQTT, slog.Default())
+	mqttClient, err := mqtt.NewMQTTClient(cfg, slog.Default())
 	if err != nil {
 		return nil, fmt.Errorf("Error creating MQTT client: %v", err)
 	}
 
 	// Create MIDI handler
 	midiHandler, err := midi.NewMIDIHandler(cfg.MIDI.Port, &cfg.MIDI, func(data []byte) error {
-		if err := mqttClient.Publish(cfg.MQTT.Topics.Publications[0].Topic, data); err != nil {
+		if err := mqttClient.PublishToAll(data); err != nil {
 			return fmt.Errorf("Error publishing MIDI event: %v", err)
 		}
 		if cfg.LogLevel == "DEBUG" {
@@ -92,7 +92,20 @@ func (a *App) Start(ctx context.Context) error {
 
 	slog.Info("Started MIDI to MQTT bridge")
 	slog.Info("Listening on MIDI port", "port", a.cfg.MIDI.Port)
-	slog.Info("Publishing to MQTT topic", "topic", a.cfg.MQTT.Topics.Publications[0].Topic)
+
+	if len(a.cfg.MQTTPublications) > 0 {
+		for _, pub := range a.cfg.MQTTPublications {
+			if pub.Enabled {
+				slog.Info("Publishing to MQTT topic", 
+					"type", pub.Type,
+					"topic", pub.Topic,
+					"qos", pub.QoS,
+					"retain", pub.Retain)
+			}
+		}
+	} else {
+		slog.Warn("No MQTT publication topics configured")
+	}
 
 	// Wait for context cancellation
 	<-ctx.Done()

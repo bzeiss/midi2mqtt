@@ -12,9 +12,25 @@ import (
 )
 
 type Config struct {
-	MQTT     MQTTConfig `yaml:"mqtt"`
-	MIDI     MIDIConfig `yaml:"midi"`
-	LogLevel string     `yaml:"log_level"`
+	MQTT             MQTTConfig          `yaml:"mqtt_server"`
+	MIDI             MIDIConfig          `yaml:"midi"`
+	LogLevel         string              `yaml:"log_level"`
+	MQTTPublications []PublicationConfig `yaml:"mqtt_publications"`
+}
+
+type PublicationType string
+
+const (
+	PublicationTypeCustomJSON    PublicationType = "custom_json"
+	PublicationTypeHomeAssistant PublicationType = "home_assistant"
+)
+
+type PublicationConfig struct {
+	Type    PublicationType `yaml:"type"`
+	Enabled bool            `yaml:"enabled"`
+	Topic   string          `yaml:"topic"`
+	QoS     int             `yaml:"qos"`
+	Retain  bool            `yaml:"retain"`
 }
 
 type MQTTConfig struct {
