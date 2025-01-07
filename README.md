@@ -46,29 +46,12 @@ Available MIDI ports:
 
 # Test MIDI events without MQTT
 $ midi2mqtt -test
-Using config file: /path/to/config/midi2mqtt.yaml
-Started MIDI test mode
-Listening on MIDI port: Arturia KeyStep 37:Arturia KeyStep 37 MIDI 1 36:0
-Press Ctrl+C to exit
-{
-  "timestamp": "2024-12-11T23:12:35.313590024+01:00",
-  "port": "Arturia KeyStep 37:Arturia KeyStep 37 MIDI 1 36:0",
-  "channel": 0,
-  "note": 60,
-  "key": "C",
-  "octave": 4,
-  "velocity": 105,
-  "event_type": "note_on"
-}
-{
-  "timestamp": "2024-12-11T23:12:35.886200485+01:00",
-  "port": "Arturia KeyStep 37:Arturia KeyStep 37 MIDI 1 36:0",
-  "channel": 0,
-  "note": 60,
-  "key": "C",
-  "octave": 4,
-  "event_type": "note_off"
-}
+2025/01/07 22:27:24 INFO Using config file path=/etc/midi2mqtt.yaml
+2025/01/07 22:27:24 INFO Started MIDI test mode
+2025/01/07 22:27:24 INFO Listening on MIDI port port="MPK mini 3:MPK mini 3 MIDI 1"
+2025/01/07 22:27:24 INFO Press Ctrl+C to exit
+2025/01/07 22:27:25 INFO Received MIDI event data="{\n  \"timestamp\": \"2025-01-07T22:27:25.567315529+01:00\",\n  \"port\": \"MPK mini 3:MPK mini 3 MIDI 1 40:0\",\n  \"channel\": 0,\n  \"note\": 60,\n  \"key\": \"C\",\n  \"octave\": 4,\n  \"velocity\": 51,\n  \"event_type\": \"note_on\"\n}"
+2025/01/07 22:27:25 INFO Received MIDI event data="{\n  \"timestamp\": \"2025-01-07T22:27:25.795211919+01:00\",\n  \"port\": \"MPK mini 3:MPK mini 3 MIDI 1 40:0\",\n  \"channel\": 0,\n  \"note\": 60,\n  \"key\": \"C\",\n  \"octave\": 4,\n  \"event_type\": \"note_off\"\n}"
 ```
 
 ## Configuration
