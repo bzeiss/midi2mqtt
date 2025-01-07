@@ -59,13 +59,13 @@ func NewApp(cfg *config.Config) (*App, error) {
 	// Create MQTT client
 	mqttClient, err := mqtt.NewMQTTClient(&cfg.MQTT, slog.Default())
 	if err != nil {
-		return nil, fmt.Errorf("failed to create MQTT client: %w", err)
+		return nil, fmt.Errorf("Error creating MQTT client: %v", err)
 	}
 
 	// Create MIDI handler
 	midiHandler, err := midi.NewMIDIHandler(cfg.MIDI.Port, &cfg.MIDI, func(data []byte) error {
 		if err := mqttClient.Publish(cfg.MQTT.Topics.Publications[0].Topic, data); err != nil {
-			return fmt.Errorf("failed to publish MIDI event: %w", err)
+			return fmt.Errorf("Error publishing MIDI event: %v", err)
 		}
 		if cfg.LogLevel == "DEBUG" {
 			slog.Debug("MIDI event", "data", formatEvent(data))
@@ -74,7 +74,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 	})
 	if err != nil {
 		mqttClient.Disconnect() // Clean up MQTT client if MIDI fails
-		return nil, fmt.Errorf("failed to create MIDI handler: %w", err)
+		return nil, fmt.Errorf("Error creating MIDI handler: %v", err)
 	}
 
 	return &App{
@@ -87,7 +87,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 func (a *App) Start(ctx context.Context) error {
 	// Start MIDI handler
 	if err := a.midiHandler.Start(); err != nil {
-		return fmt.Errorf("failed to start MIDI handler: %w", err)
+		return fmt.Errorf("Error starting MIDI handler: %v", err)
 	}
 
 	slog.Info("Started MIDI to MQTT bridge")
@@ -191,7 +191,7 @@ func runTestMode(cfg *config.Config) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create MIDI handler: %w", err)
+		return fmt.Errorf("Error creating MIDI handler: %v", err)
 	}
 	defer handler.Close()
 

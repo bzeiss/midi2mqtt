@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -103,38 +102,51 @@ func (m *MQTTClient) Connect() error {
 		opts.SetPassword(m.config.Auth.Password)
 	}
 
-	// Set connection timeouts and retry options
-	opts.SetConnectTimeout(time.Duration(m.config.Connection.Timeout) * time.Second)
+	// Set initial connection timeouts without retries
+	opts.SetConnectTimeout(5 * time.Second)
+	opts.SetWriteTimeout(2 * time.Second)
+	opts.SetConnectRetry(false)
+	opts.SetAutoReconnect(false)
+
+	// Log initial connection attempt
+	m.logger.Info("Testing MQTT connection", "broker", broker)
+
+	// First try to connect without retries to verify credentials
+	client := paho.NewClient(opts)
+	token := client.Connect()
+	if !token.WaitTimeout(2*time.Second) && token.Error() == nil {
+		client.Disconnect(250)
+		return fmt.Errorf("connection timeout - check if broker is reachable (Broker: %s)", broker)
+	}
+	if err := token.Error(); err != nil {
+		client.Disconnect(250)
+		return fmt.Errorf("%v (Broker: %s)", err, broker)
+	}
+
+	// Initial connection successful, disconnect and reconnect with retries enabled
+	client.Disconnect(250)
+
+	// Now set up the persistent connection with retries
 	opts.SetConnectRetry(true)
 	opts.SetAutoReconnect(true)
 	opts.SetMaxReconnectInterval(time.Duration(m.config.Connection.RetryInterval) * time.Second)
 	opts.SetResumeSubs(true)
 
-	// Set connection handlers
+	// Set connection handlers for the persistent connection
 	opts.SetOnConnectHandler(m.onConnect)
 	opts.SetConnectionLostHandler(m.onConnectionLost)
 	opts.SetReconnectingHandler(m.onReconnecting)
 
 	m.client = paho.NewClient(opts)
+	m.logger.Info("Establishing persistent MQTT connection", "broker", broker)
 
-	// Connect with timeout
-	token := m.client.Connect()
-	if !token.WaitTimeout(5 * time.Second) {
-		return fmt.Errorf("connection timeout while connecting to:\n  %s", broker)
+	// Connect with retries enabled
+	token = m.client.Connect()
+	if !token.WaitTimeout(2*time.Second) && token.Error() == nil {
+		return fmt.Errorf("connection timeout on persistent connection (Broker: %s)", broker)
 	}
 	if err := token.Error(); err != nil {
-		// Check for common authentication errors
-		errStr := err.Error()
-		switch {
-		case strings.Contains(errStr, "identifier rejected"):
-			return fmt.Errorf("authentication failed - incorrect username or password\nBroker: %s", broker)
-		case strings.Contains(errStr, "not authorised"):
-			return fmt.Errorf("authorization failed - user does not have permission\nBroker: %s", broker)
-		case strings.Contains(errStr, "connection refused"):
-			return fmt.Errorf("connection refused - check your credentials and broker settings\nBroker: %s", broker)
-		default:
-			return fmt.Errorf("connection failed:\n  %v\nBroker: %s", err, broker)
-		}
+		return fmt.Errorf("%v (Broker: %s)", err, broker)
 	}
 
 	m.isConnected = true
