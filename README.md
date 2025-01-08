@@ -33,6 +33,7 @@ Usage: midi2mqtt [options]
 Options:
   -list-ports     List available MIDI ports and exit
   -test          Run in test mode (print MIDI events to stdout)
+  -all-events    Listen to all MIDI events
 ```
 
 Example outputs:
