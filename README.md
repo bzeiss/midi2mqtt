@@ -76,7 +76,11 @@ For a complete configuration example with all available options and their descri
 
 ## Home Assistant Integration
 
-For mqtt events of publication type custom_json, to these MIDI events into Home Assistant, add a configuration such as the following to your `configuration.yaml`:
+There are two ways to integrate MIDI events with Home Assistant:
+
+### 1. Custom JSON Integration
+
+For mqtt events of publication type `custom_json`, you can add these MIDI events into Home Assistant by adding a configuration such as the following to your `configuration.yaml`:
 
 ```yaml
 mqtt:
@@ -107,21 +111,19 @@ This configuration creates a sensor that:
 - Updates in real-time as MIDI events occur
 - Can be used in automations and scripts
 
-A more easy to use publication type for home assistant with mqtt discovery will be included in a future release.
-
-### Creating Automations in Home Assistant
+#### Creating Automations with Custom JSON
 
 You can create automations using the Home Assistant GUI to react to MIDI events. Here's how to access the MIDI event attributes:
 
 1. Go to Settings → Automations & Scenes → Create Automation
-1. Add a trigger:
+2. Add a trigger:
    - Choose "Entity" -> "State" as trigger type
    - Select the MIDI Event Sensor entity
    - Optionally set a specific state attribute to trigger on (e.g., Event Type "note_on" or "control_change")
 
-1. Add a condition (optional)
+3. Add a condition (optional)
 
-1. Add your desired action:
+4. Add your desired action:
    - For continuous controls (like faders), you can use the attribute value:
      ```
      {{ trigger.to_state.attributes.value }}  {# For control change values #}
@@ -141,6 +143,40 @@ Available attributes in the sensor:
 - `value`: Controller value (0-127, for control_change events)
 - `pitch_bend`: Pitch bend value (for pitch_bend events)
 - `program`: Program number (for program_change events)
+
+### 2. Native Home Assistant MQTT Discovery
+
+The `home_assistant` publication type provides native MQTT discovery integration with Home Assistant. When enabled, it automatically:
+
+- Creates individual binary sensors for each MIDI key
+- Uses MQTT discovery to automatically register devices and entities
+- Shows the current state of each key (on/off) in real-time
+
+To use this integration:
+
+1. Enable the `home_assistant` publication type in your configuration:
+   ```yaml
+   mqtt_publications:
+     - type: home_assistant
+       enabled: true
+       topic: "homeassistant/sensor/your_device_name"
+       qos: 1
+       retain: false
+       device:
+         identifiers: ["your_device_name"]
+         name: "Your MIDI Device"
+         manufacturer: "Device Manufacturer"
+   ```
+
+2. Home Assistant will automatically discover the MIDI keys as binary sensors
+3. Each key will appear as a separate entity that shows whether it's currently pressed (on) or released (off)
+4. You can use these sensors directly in your automations, scripts, and dashboards
+
+This native integration provides a more seamless experience as it:
+- Requires no manual configuration in Home Assistant
+- Creates properly named and organized entities
+- Provides real-time state updates
+- Maintains state between Home Assistant restarts
 
 ## Known Issues / Untested
 
