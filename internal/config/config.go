@@ -26,11 +26,19 @@ const (
 )
 
 type PublicationConfig struct {
-	Type    PublicationType `yaml:"type"`
-	Enabled bool            `yaml:"enabled"`
-	Topic   string          `yaml:"topic"`
-	QoS     int             `yaml:"qos"`
-	Retain  bool            `yaml:"retain"`
+	Type      PublicationType `yaml:"type"`
+	Enabled   bool            `yaml:"enabled"`
+	Topic     string          `yaml:"topic"`
+	QoS       int             `yaml:"qos"`
+	Retain    bool            `yaml:"retain"`
+	UniqueID  string          `yaml:"unique_id,omitempty"`
+	Device    *DeviceConfig   `yaml:"device,omitempty"`
+}
+
+type DeviceConfig struct {
+	Identifiers  []string `yaml:"identifiers"`
+	Name         string   `yaml:"name"`
+	Manufacturer string   `yaml:"manufacturer"`
 }
 
 type MQTTConfig struct {

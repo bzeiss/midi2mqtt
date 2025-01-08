@@ -3,9 +3,11 @@ package mqtt
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +25,7 @@ type MQTTClient struct {
 	isConnected  bool
 	reconnecting bool
 	logger       *slog.Logger
+	haManager    *HomeAssistantManager
 }
 
 // NewMQTTClient creates a new MQTT client and establishes a connection
@@ -31,6 +34,7 @@ func NewMQTTClient(cfg *config.Config, logger *slog.Logger) (*MQTTClient, error)
 		mqttConfig: &cfg.MQTT,
 		rootConfig: cfg,
 		logger:     logger,
+		haManager:  NewHomeAssistantManager(),
 	}
 
 	if err := m.Connect(); err != nil {
@@ -244,18 +248,93 @@ func (m *MQTTClient) PublishCustomJSON(payload []byte, pub *config.PublicationCo
 	m.logger.Debug("Publishing to custom_json topic",
 		"topic", pub.Topic,
 		"qos", pub.QoS,
-		"retain", pub.Retain)
+		"retain", pub.Retain,
+		"payload", string(payload))
 	return m.publishToTopic(pub.Topic, byte(pub.QoS), pub.Retain, payload)
 }
 
 // PublishHomeAssistant publishes a message using the Home Assistant publication configuration
 func (m *MQTTClient) PublishHomeAssistant(payload []byte, pub *config.PublicationConfig) error {
-	m.logger.Debug("Publishing to home_assistant topic",
-		"topic", pub.Topic,
-		"qos", pub.QoS,
-		"retain", pub.Retain)
-	// TODO: Implement Home Assistant specific payload formatting if needed
-	return m.publishToTopic(pub.Topic, byte(pub.QoS), pub.Retain, payload)
+	// Parse MIDI event
+	var event struct {
+		Note      uint8  `json:"note"`
+		Key       string `json:"key"`
+		Octave    int    `json:"octave"`
+		EventType string `json:"event_type"`
+	}
+	if err := json.Unmarshal(payload, &event); err != nil {
+		return fmt.Errorf("failed to parse MIDI event: %w", err)
+	}
+
+	// Only process note_on and note_off events
+	if event.EventType != "note_on" && event.EventType != "note_off" {
+		return nil
+	}
+
+	// Use the key as the unique sensor identifier
+	configID := fmt.Sprintf("%s%d", event.Key, event.Octave)
+
+	// Replace # with s for topic path
+	safeKey := strings.ReplaceAll(strings.ToLower(event.Key), "#", "s")
+	notePath := fmt.Sprintf("note_%s%d", safeKey, event.Octave)
+
+	// For note_on events, check if we need to send config
+	if event.EventType == "note_on" && !m.haManager.HasConfigBeenSent(configID) {
+		// Prepare device config
+		deviceConfig := map[string]interface{}{
+			"identifiers":  pub.Device.Identifiers,
+			"name":         pub.Device.Name,
+			"manufacturer": pub.Device.Manufacturer,
+		}
+
+		// Build config message
+		baseTopic := strings.Replace(pub.Topic, "sensor", "binary_sensor", 1)
+		configMsg, err := m.haManager.BuildConfigMessage(
+			strings.Replace(baseTopic, "note", notePath, 1),
+			pub.UniqueID,
+			deviceConfig,
+			configID)
+		if err != nil {
+			return fmt.Errorf("failed to build Home Assistant config message: %w", err)
+		}
+
+		// Use configured QoS and retain settings for config messages
+		configTopic := strings.Replace(baseTopic, "note", notePath, 1) + "/config"
+		if err := m.publishToTopic(configTopic, byte(pub.QoS), pub.Retain, configMsg); err != nil {
+			m.logger.Error("Failed to publish Home Assistant config",
+				"topic", configTopic,
+				"key", configID,
+				"error", err)
+			// Don't mark as sent if publish failed
+			return err
+		}
+
+		// Only mark as sent if publish was successful
+		m.haManager.MarkConfigAsSent(configID)
+		m.logger.Debug("Published Home Assistant config",
+			"topic", configTopic,
+			"key", configID,
+			"payload", string(configMsg))
+	}
+
+	// Set state based on event type
+	state := "off"
+	if event.EventType == "note_on" {
+		state = "on"
+	}
+
+	// Publish state message with configured QoS
+	baseTopic := strings.Replace(pub.Topic, "sensor", "binary_sensor", 1)
+	stateTopic := strings.Replace(baseTopic, "note", notePath, 1) + "/state"
+	if err := m.publishToTopic(stateTopic, byte(pub.QoS), pub.Retain, []byte(state)); err != nil {
+		return fmt.Errorf("failed to publish Home Assistant state: %w", err)
+	}
+
+	m.logger.Debug("Published state",
+		"topic", stateTopic,
+		"state", state,
+		"payload", state)
+	return nil
 }
 
 // Disconnect cleanly disconnects from the MQTT broker

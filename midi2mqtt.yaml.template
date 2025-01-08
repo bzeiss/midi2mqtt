@@ -35,10 +35,20 @@ mqtt_server:
 # MQTT Publication Configuration
 mqtt_publications:
   - type: custom_json
-    enabled: true
+    enabled: false
     topic: "midi/events"
     qos: 1
     retain: false
+  - type: home_assistant
+    enabled: true
+    topic: "homeassistant/sensor/akai_mpk_mini"
+    qos: 1
+    retain: false
+    unique_id: "arturia_mpk_mini"
+    device:
+      identifiers: ["arturia_mpk_mini"]
+      name: "Arturia MPK Mini"
+      manufacturer: "Arturia"
 
 midi:
   # MIDI port configuration
