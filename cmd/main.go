@@ -138,6 +138,7 @@ func main() {
 	// Parse command line flags
 	showPorts := flag.Bool("list-ports", false, "List available MIDI ports and exit")
 	testMode := flag.Bool("test", false, "Run in test mode (print MIDI events to stdout)")
+	allEvents := flag.Bool("all-events", false, "Listening to all MIDI events")
 	flag.Parse()
 
 	// Handle list-ports command first, before loading config
@@ -160,6 +161,11 @@ func main() {
 	}
 
 	slog.Info("Using config file", "path", configPath)
+
+	if *allEvents {
+		cfg.MIDI.EventTypes = nil
+		slog.Info("Listening to all MIDI events")
+	}
 
 	if *testMode {
 		if err := runTestMode(cfg); err != nil {
